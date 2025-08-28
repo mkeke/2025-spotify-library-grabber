@@ -1,16 +1,27 @@
 # Spotify Library Grabber
 
+This app creates a local folder structure with json files of your Spotify library, consisting of
+- Playlists (including Liked Songs)
+- Podcasts
+- Albums
+- Artists removed
+
+The app will start a temporary web server on your machine just to handle the one-time authentication with Spotify. Once you authorize the app in your browser, it will fetch everything and save it locally.
+
+It was made using Google's Gemini 2.5 Pro and CoPilot, with some human intervention.
+
+# Important notice
+
+Spotify has rate limits, making the script fail if you run it too many times in a short while. The error is logged to the terminal.
+
 # Gemini 2.5 Pro prompt
 
 How can I make a node app that gathers my Spotify library and saves the playlists and albums in a folder structure?
 
-# response (edited to work)
-
-Of course! You can create a Node.js application to organize your Spotify library into local folders. This process involves authenticating with Spotify, fetching your data using their API, and then using Node's built-in modules to create the necessary files and directories.
-
-This script will start a temporary web server on your machine just to handle the one-time authentication with Spotify. Once you authorize the app in your browser, it will fetch everything and save it locally.
+# Usage
 
 ## Prerequisites
+
 1. Node.js: Make sure you have Node.js installed on your computer.
 2. Spotify Account: A regular or premium Spotify account.
 3. Spotify for Developers App: You need to register a free app to get API credentials.
@@ -46,13 +57,17 @@ Once it's finished, you will have a new folder named Spotify Library in your pro
 ```
 Spotify Library/
 ├── Albums/
-│   ├── The Beatles - Abbey Road/
-│   │   └── album_info.json
-│   └── Daft Punk - Random Access Memories/
+│   └── Artist - Album Name/
 │       └── album_info.json
-└── Playlists/
-    ├── My Awesome Mix.json
-    └── Lofi Beats.json
+├── Artists/
+│   ├── An Artist You Follow.json
+│   └── Another Artist.json
+├── Playlists/
+│   ├── Liked Songs.json
+│   └── Your Custom Playlist.json
+└── Podcasts/
+    └── A Podcast You Save/
+        └── show_info.json
 ```
 
 Each JSON file will contain detailed information about the album or a full list of the tracks in the playlist.
@@ -67,6 +82,15 @@ Each JSON file will contain detailed information about the album or a full list 
 ----------------------------------------------------
 Waiting for you to authorize the application...
 🚀 Successfully authenticated with Spotify!
+🎵 Fetching Liked Songs...
+📂 Found 6101 liked songs. Saving them now...
+✅ Liked Songs saved!
+🎵 Fetching saved podcasts...
+📂 Found 27 podcasts. Saving them now...
+✅ All podcasts saved!
+🎵 Fetching followed artists...
+📂 Found 38 followed artists. Saving them now...
+✅ All followed artists saved!
 🎵 Fetching saved albums...
 📂 Found 16 albums. Saving them now...
 ✅ All albums saved!

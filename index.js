@@ -15,6 +15,7 @@ const scopes = [
   'user-library-read',
   'playlist-read-private',
   'playlist-read-collaborative',
+  'user-follow-read',
 ];
 
 const spotifyApi = new SpotifyWebApi({
@@ -140,6 +141,112 @@ const savePlaylists = async () => {
   console.log('✅ All playlists saved!');
 };
 
+/**
+ * Fetches all of the user's "Liked Songs" (saved tracks) and saves them.
+ */
+const saveLikedSongs = async () => {
+  console.log('🎵 Fetching Liked Songs...');
+  // The endpoint for saved tracks is getMySavedTracks
+  const savedTracksData = await fetchAllItems((options) => spotifyApi.getMySavedTracks(options));
+  const playlistsDir = path.join(outputDir, 'Playlists');
+  await fs.mkdir(playlistsDir, { recursive: true }); // Ensure directory exists
+
+  console.log(`📂 Found ${savedTracksData.length} liked songs. Saving them now...`);
+
+  // Structure the data to resemble a playlist object for consistency
+  const likedSongsPlaylist = {
+    name: 'Liked Songs',
+    description: 'Your collection of liked songs from Spotify.',
+    owner: 'You',
+    tracks: savedTracksData.map(item => ({
+      name: item.track.name,
+      artist: item.track.artists.map(a => a.name).join(', '),
+      album: item.track.album.name,
+      added_at: item.added_at,
+      uri: item.track.uri,
+    })),
+  };
+
+  await fs.writeFile(
+    path.join(playlistsDir, 'Liked Songs.json'),
+    JSON.stringify(likedSongsPlaylist, null, 2)
+  );
+  console.log('✅ Liked Songs saved!');
+};
+
+/**
+ * Fetches all of the user's saved podcasts (shows) and saves them.
+ */
+const savePodcasts = async () => {
+  console.log('🎵 Fetching saved podcasts...');
+  const podcastsData = await fetchAllItems((options) => spotifyApi.getMySavedShows(options));
+  const podcastsDir = path.join(outputDir, 'Podcasts');
+  await fs.mkdir(podcastsDir, { recursive: true });
+
+  console.log(`📂 Found ${podcastsData.length} podcasts. Saving them now...`);
+
+  for (const item of podcastsData) {
+    const show = item.show;
+    const showFolderName = sanitizeFilename(show.name);
+    const fullShowPath = path.join(podcastsDir, showFolderName);
+    await fs.mkdir(fullShowPath, { recursive: true });
+
+    const showInfo = {
+      name: show.name,
+      publisher: show.publisher,
+      description: show.description,
+      total_episodes: show.total_episodes,
+      uri: show.uri,
+    };
+
+    await fs.writeFile(
+      path.join(fullShowPath, 'show_info.json'),
+      JSON.stringify(showInfo, null, 2)
+    );
+  }
+  console.log('✅ All podcasts saved!');
+};
+
+
+/**
+ * Fetches all of the user's followed artists and saves them.
+ * NOTE: This uses cursor-based pagination, which is different from other endpoints.
+ */
+const saveFollowedArtists = async () => {
+  console.log('🎵 Fetching followed artists...');
+  const artistsDir = path.join(outputDir, 'Artists');
+  await fs.mkdir(artistsDir, { recursive: true });
+
+  let artists = [];
+  let after = null; // The cursor for the next page
+  let response;
+
+  // Loop until there are no more pages
+  do {
+    response = await spotifyApi.getFollowedArtists({ limit: 50, after });
+    const newArtists = response.body.artists.items;
+    artists = artists.concat(newArtists);
+    after = response.body.artists.cursors.after;
+  } while (after);
+
+  console.log(`📂 Found ${artists.length} followed artists. Saving them now...`);
+
+  for (const artist of artists) {
+    const artistName = sanitizeFilename(artist.name);
+    const artistInfo = {
+      name: artist.name,
+      genres: artist.genres,
+      popularity: artist.popularity,
+      followers: artist.followers.total,
+      uri: artist.uri,
+    };
+    await fs.writeFile(
+      path.join(artistsDir, `${artistName}.json`),
+      JSON.stringify(artistInfo, null, 2)
+    );
+  }
+  console.log('✅ All followed artists saved!');
+};
 
 // --- Authentication Server ---
 const app = express();
@@ -154,7 +261,7 @@ app.get('/callback', async (req, res) => {
 
   if (error) {
     console.error('Callback Error:', error);
-    res.send(`Callback Error: ${error}`);
+    if (!res.headersSent) res.send(`Callback Error: ${error}`);
     return;
   }
 
@@ -167,18 +274,25 @@ app.get('/callback', async (req, res) => {
     spotifyApi.setRefreshToken(refresh_token);
 
     console.log('🚀 Successfully authenticated with Spotify!');
-    res.send('Authentication successful! You can close this tab. Check your console.');
+    if (!res.headersSent) res.send('Authentication successful! You can close this tab. Check your console.');
 
     // --- Start the backup process ---
     await fs.mkdir(outputDir, { recursive: true });
+    await saveLikedSongs();
+    await savePodcasts();
+    await saveFollowedArtists();
     await saveAlbums();
     await savePlaylists();
-    console.log('\n🎉 All done! Your Spotify library has been saved.');
+    console.log('\n🎉 All done! Your complete Spotify library has been saved.');
     process.exit(0); // Exit the app once done
 
   } catch (err) {
+    // Log the error details
     console.error('Error getting Tokens:', err);
-    res.send('Error getting tokens. Check console.');
+    if (err.statusCode === 429) {
+      console.error('Rate limited by Spotify. Retry after:', err.headers['retry-after'], 'seconds');
+    }
+    if (!res.headersSent) res.send('Error getting tokens. Check console.');
   }
 });
 
