@@ -4,7 +4,7 @@ This app creates a local folder structure with json files of your Spotify librar
 - Playlists (including Liked Songs)
 - Podcasts
 - Albums
-- Artists removed
+- Artists
 
 The app will start a temporary web server on your machine just to handle the one-time authentication with Spotify. Once you authorize the app in your browser, it will fetch everything and save it locally.
 
